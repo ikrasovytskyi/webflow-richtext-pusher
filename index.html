@@ -1,0 +1,730 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Webflow Rich Text Pusher</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/marked/12.0.1/marked.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/mammoth/1.6.0/mammoth.browser.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/dompurify/3.0.9/purify.min.js"></script>
+<style>
+  :root {
+    --bg: #0f1117;
+    --surface: #1a1d27;
+    --surface2: #242836;
+    --border: #2e3345;
+    --text: #e4e7ef;
+    --text2: #8b90a0;
+    --accent: #4f6df5;
+    --accent-hover: #3d5be0;
+    --success: #34d399;
+    --warning: #fbbf24;
+    --danger: #f87171;
+    --radius: 10px;
+  }
+
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+    background: var(--bg);
+    color: var(--text);
+    min-height: 100vh;
+  }
+
+  /* Layout */
+  .app { max-width: 1200px; margin: 0 auto; padding: 24px; }
+
+  .header {
+    display: flex; align-items: center; justify-content: space-between;
+    padding: 16px 0 24px; border-bottom: 1px solid var(--border); margin-bottom: 24px;
+  }
+  .header h1 { font-size: 20px; font-weight: 600; }
+  .header h1 span { color: var(--accent); }
+  .header .token-status { font-size: 13px; color: var(--text2); display: flex; align-items: center; gap: 8px; }
+  .header .token-status .dot { width: 8px; height: 8px; border-radius: 50%; }
+  .header .token-status .dot.on { background: var(--success); }
+  .header .token-status .dot.off { background: var(--danger); }
+  .header .btn-disconnect { background: none; border: 1px solid var(--border); color: var(--text2); padding: 6px 12px; border-radius: 6px; cursor: pointer; font-size: 12px; }
+  .header .btn-disconnect:hover { border-color: var(--danger); color: var(--danger); }
+
+  /* Steps */
+  .steps { display: flex; gap: 8px; margin-bottom: 24px; }
+  .step-indicator {
+    padding: 8px 16px; border-radius: 20px; font-size: 13px; font-weight: 500;
+    background: var(--surface); color: var(--text2); border: 1px solid var(--border);
+  }
+  .step-indicator.active { background: var(--accent); color: white; border-color: var(--accent); }
+  .step-indicator.done { background: var(--surface2); color: var(--success); border-color: var(--success); }
+
+  /* Cards */
+  .card {
+    background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius);
+    padding: 24px; margin-bottom: 16px;
+  }
+  .card h2 { font-size: 16px; font-weight: 600; margin-bottom: 16px; }
+  .card h3 { font-size: 14px; font-weight: 600; margin-bottom: 12px; color: var(--text2); }
+
+  /* Inputs */
+  input[type="text"], input[type="password"], textarea, select {
+    width: 100%; padding: 10px 14px; background: var(--surface2); border: 1px solid var(--border);
+    border-radius: 8px; color: var(--text); font-size: 14px; font-family: inherit; outline: none;
+  }
+  input:focus, textarea:focus, select:focus { border-color: var(--accent); }
+  textarea { resize: vertical; min-height: 120px; font-family: 'SF Mono', 'Fira Code', monospace; font-size: 13px; }
+  select { cursor: pointer; appearance: none; background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' fill='%238b90a0' viewBox='0 0 16 16'%3E%3Cpath d='M8 11L3 6h10z'/%3E%3C/svg%3E"); background-repeat: no-repeat; background-position: right 12px center; }
+  label { display: block; font-size: 13px; color: var(--text2); margin-bottom: 6px; }
+
+  /* Buttons */
+  .btn {
+    display: inline-flex; align-items: center; gap: 8px; padding: 10px 20px;
+    border-radius: 8px; font-size: 14px; font-weight: 500; cursor: pointer;
+    border: none; transition: all 0.15s;
+  }
+  .btn-primary { background: var(--accent); color: white; }
+  .btn-primary:hover { background: var(--accent-hover); }
+  .btn-primary:disabled { opacity: 0.5; cursor: not-allowed; }
+  .btn-secondary { background: var(--surface2); color: var(--text); border: 1px solid var(--border); }
+  .btn-secondary:hover { border-color: var(--text2); }
+  .btn-danger { background: var(--danger); color: white; }
+  .btn-sm { padding: 6px 12px; font-size: 13px; }
+
+  /* Drop zone */
+  .dropzone {
+    border: 2px dashed var(--border); border-radius: var(--radius); padding: 48px 24px;
+    text-align: center; cursor: pointer; transition: all 0.2s;
+  }
+  .dropzone:hover, .dropzone.dragover { border-color: var(--accent); background: rgba(79,109,245,0.05); }
+  .dropzone .icon { font-size: 36px; margin-bottom: 12px; }
+  .dropzone p { color: var(--text2); font-size: 14px; }
+  .dropzone .formats { font-size: 12px; color: var(--text2); margin-top: 8px; }
+
+  /* Item list */
+  .item-list { max-height: 300px; overflow-y: auto; }
+  .item-row {
+    display: flex; align-items: center; justify-content: space-between;
+    padding: 10px 14px; border-radius: 8px; cursor: pointer; transition: background 0.1s;
+  }
+  .item-row:hover { background: var(--surface2); }
+  .item-row.selected { background: var(--accent); color: white; }
+  .item-row .item-name { font-size: 14px; font-weight: 500; }
+  .item-row .item-slug { font-size: 12px; color: var(--text2); }
+  .item-row.selected .item-slug { color: rgba(255,255,255,0.7); }
+  .item-row .item-meta { text-align: right; }
+  .item-row .item-draft { font-size: 11px; padding: 2px 8px; border-radius: 4px; background: var(--warning); color: #000; font-weight: 600; }
+
+  /* Search */
+  .search-box { position: relative; margin-bottom: 12px; }
+  .search-box input { padding-left: 36px; }
+  .search-box .search-icon { position: absolute; left: 12px; top: 50%; transform: translateY(-50%); color: var(--text2); font-size: 14px; }
+
+  /* Preview */
+  .preview-panel {
+    display: grid; grid-template-columns: 1fr 1fr; gap: 16px;
+  }
+  .preview-rendered {
+    background: white; color: #333; border-radius: 8px; padding: 20px;
+    max-height: 400px; overflow-y: auto; font-size: 14px; line-height: 1.6;
+  }
+  .preview-rendered h1, .preview-rendered h2, .preview-rendered h3 { color: #111; margin: 16px 0 8px; }
+  .preview-rendered a { color: var(--accent); }
+  .preview-rendered img { max-width: 100%; height: auto; }
+  .preview-raw {
+    background: var(--surface2); border-radius: 8px; padding: 16px;
+    max-height: 400px; overflow-y: auto; font-family: 'SF Mono', monospace; font-size: 12px;
+    color: var(--text2); white-space: pre-wrap; word-break: break-all;
+  }
+
+  /* Validation */
+  .validation { margin: 16px 0; }
+  .val-item { display: flex; align-items: center; gap: 8px; padding: 6px 0; font-size: 13px; }
+  .val-item .icon { width: 18px; text-align: center; }
+  .val-pass { color: var(--success); }
+  .val-warn { color: var(--warning); }
+  .val-fail { color: var(--danger); }
+
+  /* Result */
+  .result-box {
+    padding: 16px 20px; border-radius: 8px; margin-top: 16px; font-size: 14px;
+  }
+  .result-box.success { background: rgba(52,211,153,0.1); border: 1px solid var(--success); color: var(--success); }
+  .result-box.error { background: rgba(248,113,113,0.1); border: 1px solid var(--danger); color: var(--danger); }
+
+  /* Loading */
+  .spinner { display: inline-block; width: 16px; height: 16px; border: 2px solid rgba(255,255,255,0.3); border-top-color: white; border-radius: 50%; animation: spin 0.6s linear infinite; }
+  @keyframes spin { to { transform: rotate(360deg); } }
+
+  /* Stats bar */
+  .stats-bar { display: flex; gap: 24px; margin: 12px 0; }
+  .stat { font-size: 13px; color: var(--text2); }
+  .stat strong { color: var(--text); }
+
+  /* Grid layout for step 3 */
+  .push-layout { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+  @media (max-width: 800px) { .push-layout, .preview-panel { grid-template-columns: 1fr; } }
+
+  /* Tabs */
+  .tabs { display: flex; gap: 4px; margin-bottom: 16px; }
+  .tab {
+    padding: 8px 16px; border-radius: 6px; font-size: 13px; cursor: pointer;
+    background: transparent; color: var(--text2); border: none;
+  }
+  .tab.active { background: var(--surface2); color: var(--text); }
+
+  .hidden { display: none !important; }
+
+  /* Field selector */
+  .field-row { display: flex; gap: 12px; align-items: end; margin-bottom: 16px; }
+  .field-row > div { flex: 1; }
+</style>
+</head>
+<body>
+<div class="app" id="app">
+
+  <!-- Header -->
+  <div class="header">
+    <h1><span>WF</span> Rich Text Pusher</h1>
+    <div class="token-status" id="tokenStatus">
+      <div class="dot off" id="statusDot"></div>
+      <span id="statusText">Not connected</span>
+      <button class="btn-disconnect hidden" id="btnDisconnect" onclick="disconnect()">Disconnect</button>
+    </div>
+  </div>
+
+  <!-- Step indicators -->
+  <div class="steps">
+    <div class="step-indicator active" id="stepInd1">1. Connect</div>
+    <div class="step-indicator" id="stepInd2">2. Select Item</div>
+    <div class="step-indicator" id="stepInd3">3. Push Content</div>
+  </div>
+
+  <!-- STEP 1: Auth -->
+  <div id="step1">
+    <div class="card">
+      <h2>Connect to Webflow</h2>
+      <p style="color: var(--text2); font-size: 14px; margin-bottom: 16px;">
+        Enter your Webflow API v2 token. It stays in your browser and is never sent anywhere except the Webflow API.
+      </p>
+      <label for="apiToken">API Token</label>
+      <div style="display: flex; gap: 8px;">
+        <input type="password" id="apiToken" placeholder="Paste your Webflow API token here...">
+        <button class="btn btn-primary" id="btnConnect" onclick="connect()">Connect</button>
+      </div>
+      <div id="authError" class="result-box error hidden" style="margin-top: 12px;"></div>
+    </div>
+  </div>
+
+  <!-- STEP 2: Browse & Select -->
+  <div id="step2" class="hidden">
+    <div class="card">
+      <h2>Select CMS Item</h2>
+      <div class="field-row">
+        <div>
+          <label>Site</label>
+          <select id="siteSelect" onchange="loadCollections()"><option value="">Loading sites...</option></select>
+        </div>
+        <div>
+          <label>Collection</label>
+          <select id="collectionSelect" onchange="loadItems()"><option value="">Select a site first</option></select>
+        </div>
+      </div>
+
+      <label>Field to update</label>
+      <select id="fieldSelect" style="margin-bottom: 16px;">
+        <option value="">Select a collection first</option>
+      </select>
+
+      <div class="search-box">
+        <span class="search-icon">&#128269;</span>
+        <input type="text" id="itemSearch" placeholder="Search items by name or slug..." oninput="filterItems()">
+      </div>
+      <div class="item-list" id="itemList">
+        <p style="color: var(--text2); font-size: 14px; padding: 12px;">Select a site and collection above.</p>
+      </div>
+      <div style="margin-top: 16px; display: flex; justify-content: flex-end;">
+        <button class="btn btn-primary" id="btnToStep3" disabled onclick="goToStep3()">Continue with selected item</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- STEP 3: Upload & Push -->
+  <div id="step3" class="hidden">
+    <div style="margin-bottom: 12px;">
+      <button class="btn btn-secondary btn-sm" onclick="goToStep(2)">&larr; Back to item selection</button>
+      <span style="margin-left: 12px; font-size: 14px; color: var(--text2);" id="selectedItemLabel"></span>
+    </div>
+
+    <div class="push-layout">
+      <!-- Left: Content input -->
+      <div class="card">
+        <h2>Content</h2>
+
+        <div class="tabs">
+          <button class="tab active" onclick="switchTab('upload', this)">Upload File</button>
+          <button class="tab" onclick="switchTab('paste', this)">Paste HTML</button>
+        </div>
+
+        <div id="tabUpload">
+          <div class="dropzone" id="dropzone"
+               ondragover="event.preventDefault(); this.classList.add('dragover')"
+               ondragleave="this.classList.remove('dragover')"
+               ondrop="handleDrop(event)"
+               onclick="document.getElementById('fileInput').click()">
+            <div class="icon">&#128196;</div>
+            <p>Drop your file here or click to browse</p>
+            <div class="formats">.html &middot; .md &middot; .docx</div>
+          </div>
+          <input type="file" id="fileInput" accept=".html,.htm,.md,.markdown,.docx" style="display:none" onchange="handleFile(this.files[0])">
+        </div>
+
+        <div id="tabPaste" class="hidden">
+          <textarea id="pasteArea" placeholder="Paste your HTML or Markdown here..." oninput="handlePaste()"></textarea>
+          <div style="margin-top: 8px; display: flex; gap: 8px;">
+            <button class="tab active" onclick="setPasteFormat('html', this)">HTML</button>
+            <button class="tab" onclick="setPasteFormat('md', this)">Markdown</button>
+          </div>
+        </div>
+
+        <div id="contentLoaded" class="hidden" style="margin-top: 16px;">
+          <div class="stats-bar">
+            <div class="stat">File: <strong id="fileName">—</strong></div>
+            <div class="stat">Size: <strong id="fileSize">—</strong></div>
+            <div class="stat">Format: <strong id="fileFormat">—</strong></div>
+          </div>
+
+          <div class="validation" id="validation"></div>
+
+          <div style="display: flex; gap: 8px; margin-top: 12px;">
+            <button class="btn btn-primary" id="btnPush" onclick="pushToWebflow()">Push to CMS</button>
+            <button class="btn btn-secondary" onclick="clearContent()">Clear</button>
+          </div>
+
+          <div id="pushResult" class="hidden"></div>
+        </div>
+      </div>
+
+      <!-- Right: Preview -->
+      <div class="card">
+        <h2>Preview</h2>
+        <div class="tabs">
+          <button class="tab active" onclick="switchPreview('rendered', this)">Rendered</button>
+          <button class="tab" onclick="switchPreview('raw', this)">Raw HTML</button>
+        </div>
+        <div id="previewRendered" class="preview-rendered">
+          <p style="color: #999;">Upload or paste content to see preview.</p>
+        </div>
+        <div id="previewRaw" class="preview-raw hidden">
+          No content yet.
+        </div>
+      </div>
+    </div>
+  </div>
+
+</div>
+
+<script>
+// ===== STATE =====
+let apiToken = '';
+let sites = [];
+let collections = [];
+let collectionFields = [];
+let items = [];
+let allItems = [];
+let selectedItemId = null;
+let selectedItemSlug = '';
+let htmlContent = '';
+let pasteFormat = 'html';
+let currentStep = 1;
+
+// ===== AUTH =====
+async function connect() {
+  const token = document.getElementById('apiToken').value.trim();
+  if (!token) return;
+
+  const btn = document.getElementById('btnConnect');
+  btn.disabled = true;
+  btn.innerHTML = '<div class="spinner"></div> Connecting...';
+  hideEl('authError');
+
+  try {
+    const res = await wfApi('/sites', token);
+    if (res.sites) {
+      apiToken = token;
+      sites = res.sites;
+      showConnected();
+      populateSites();
+      goToStep(2);
+    } else {
+      throw new Error('Invalid response from Webflow API');
+    }
+  } catch (e) {
+    showEl('authError');
+    document.getElementById('authError').textContent = 'Connection failed: ' + (e.message || 'Invalid token');
+  } finally {
+    btn.disabled = false;
+    btn.innerHTML = 'Connect';
+  }
+}
+
+function disconnect() {
+  apiToken = '';
+  sites = [];
+  collections = [];
+  items = [];
+  selectedItemId = null;
+  htmlContent = '';
+  document.getElementById('apiToken').value = '';
+  showDisconnected();
+  goToStep(1);
+}
+
+function showConnected() {
+  document.getElementById('statusDot').className = 'dot on';
+  document.getElementById('statusText').textContent = 'Connected';
+  showEl('btnDisconnect');
+}
+
+function showDisconnected() {
+  document.getElementById('statusDot').className = 'dot off';
+  document.getElementById('statusText').textContent = 'Not connected';
+  hideEl('btnDisconnect');
+}
+
+// ===== NAVIGATION =====
+function goToStep(n) {
+  currentStep = n;
+  ['step1','step2','step3'].forEach((id, i) => {
+    document.getElementById(id).classList.toggle('hidden', i + 1 !== n);
+  });
+  ['stepInd1','stepInd2','stepInd3'].forEach((id, i) => {
+    const el = document.getElementById(id);
+    el.className = 'step-indicator' + (i + 1 === n ? ' active' : (i + 1 < n ? ' done' : ''));
+  });
+}
+
+function goToStep3() {
+  if (!selectedItemId) return;
+  document.getElementById('selectedItemLabel').textContent =
+    `Pushing to: ${selectedItemSlug} (${selectedItemId.slice(0, 8)}...)`;
+  goToStep(3);
+}
+
+// ===== WEBFLOW API =====
+async function wfApi(path, token) {
+  token = token || apiToken;
+  const res = await fetch('/api' + path, {
+    headers: { 'Authorization': 'Bearer ' + token, 'Accept': 'application/json' }
+  });
+  if (!res.ok) {
+    const body = await res.text();
+    throw new Error(`API ${res.status}: ${body.slice(0, 200)}`);
+  }
+  return res.json();
+}
+
+async function wfPatch(path, data) {
+  const res = await fetch('/api' + path, {
+    method: 'PATCH',
+    headers: {
+      'Authorization': 'Bearer ' + apiToken,
+      'Content-Type': 'application/json',
+      'Accept': 'application/json'
+    },
+    body: JSON.stringify(data)
+  });
+  if (!res.ok) {
+    const body = await res.text();
+    throw new Error(`API ${res.status}: ${body.slice(0, 300)}`);
+  }
+  return res.json();
+}
+
+// ===== SITE / COLLECTION / ITEMS =====
+function populateSites() {
+  const sel = document.getElementById('siteSelect');
+  sel.innerHTML = '<option value="">Select a site...</option>' +
+    sites.map(s => `<option value="${s.id}">${s.displayName || s.shortName || s.id}</option>`).join('');
+}
+
+async function loadCollections() {
+  const siteId = document.getElementById('siteSelect').value;
+  const sel = document.getElementById('collectionSelect');
+  const fieldSel = document.getElementById('fieldSelect');
+  if (!siteId) { sel.innerHTML = '<option>Select a site first</option>'; return; }
+
+  sel.innerHTML = '<option>Loading...</option>';
+  try {
+    const res = await wfApi(`/sites/${siteId}/collections`);
+    collections = res.collections || [];
+    sel.innerHTML = '<option value="">Select a collection...</option>' +
+      collections.map(c => `<option value="${c.id}">${c.displayName} (${c.slug})</option>`).join('');
+    fieldSel.innerHTML = '<option value="">Select a collection first</option>';
+  } catch (e) {
+    sel.innerHTML = `<option>Error: ${e.message}</option>`;
+  }
+}
+
+async function loadItems() {
+  const colId = document.getElementById('collectionSelect').value;
+  const list = document.getElementById('itemList');
+  const fieldSel = document.getElementById('fieldSelect');
+  if (!colId) { list.innerHTML = '<p style="color:var(--text2);padding:12px;">Select a collection.</p>'; return; }
+
+  list.innerHTML = '<p style="color:var(--text2);padding:12px;">Loading items...</p>';
+
+  try {
+    // Load collection schema for field list
+    const schema = await wfApi(`/collections/${colId}`);
+    collectionFields = (schema.fields || []).filter(f => f.type === 'RichText' || f.type === 'PlainText');
+    fieldSel.innerHTML = collectionFields.length
+      ? collectionFields.map(f => `<option value="${f.slug}">${f.displayName} (${f.slug})</option>`).join('')
+      : '<option value="">No text fields found</option>';
+
+    // Load items (paginated)
+    allItems = [];
+    let offset = 0;
+    let total = 1;
+    while (offset < total) {
+      const res = await wfApi(`/collections/${colId}/items?limit=100&offset=${offset}`);
+      allItems = allItems.concat(res.items || []);
+      total = res.pagination?.total || allItems.length;
+      offset += 100;
+    }
+    items = allItems;
+    renderItems();
+  } catch (e) {
+    list.innerHTML = `<p style="color:var(--danger);padding:12px;">Error: ${e.message}</p>`;
+  }
+}
+
+function renderItems() {
+  const list = document.getElementById('itemList');
+  if (items.length === 0) {
+    list.innerHTML = '<p style="color:var(--text2);padding:12px;">No items found.</p>';
+    return;
+  }
+  list.innerHTML = items.map(item => {
+    const name = item.fieldData?.name || item.fieldData?.slug || item.id;
+    const slug = item.fieldData?.slug || '';
+    const isDraft = item.isDraft;
+    const sel = item.id === selectedItemId ? ' selected' : '';
+    return `<div class="item-row${sel}" onclick="selectItem('${item.id}', '${slug}')">
+      <div><div class="item-name">${esc(name)}</div><div class="item-slug">${esc(slug)}</div></div>
+      <div class="item-meta">${isDraft ? '<span class="item-draft">DRAFT</span>' : ''}</div>
+    </div>`;
+  }).join('');
+}
+
+function filterItems() {
+  const q = document.getElementById('itemSearch').value.toLowerCase();
+  items = allItems.filter(i => {
+    const name = (i.fieldData?.name || '').toLowerCase();
+    const slug = (i.fieldData?.slug || '').toLowerCase();
+    return name.includes(q) || slug.includes(q);
+  });
+  renderItems();
+}
+
+function selectItem(id, slug) {
+  selectedItemId = id;
+  selectedItemSlug = slug;
+  renderItems();
+  document.getElementById('btnToStep3').disabled = false;
+}
+
+// ===== CONTENT HANDLING =====
+function switchTab(tab, btn) {
+  document.getElementById('tabUpload').classList.toggle('hidden', tab !== 'upload');
+  document.getElementById('tabPaste').classList.toggle('hidden', tab !== 'paste');
+  btn.parentElement.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+  btn.classList.add('active');
+}
+
+function switchPreview(view, btn) {
+  document.getElementById('previewRendered').classList.toggle('hidden', view !== 'rendered');
+  document.getElementById('previewRaw').classList.toggle('hidden', view !== 'raw');
+  btn.parentElement.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+  btn.classList.add('active');
+}
+
+function handleDrop(e) {
+  e.preventDefault();
+  e.target.closest('.dropzone').classList.remove('dragover');
+  const file = e.dataTransfer.files[0];
+  if (file) handleFile(file);
+}
+
+async function handleFile(file) {
+  if (!file) return;
+  const ext = file.name.split('.').pop().toLowerCase();
+
+  if (ext === 'html' || ext === 'htm') {
+    const text = await file.text();
+    setContent(text, file.name, 'HTML');
+  } else if (ext === 'md' || ext === 'markdown') {
+    const text = await file.text();
+    const html = marked.parse(text);
+    setContent(html, file.name, 'Markdown → HTML');
+  } else if (ext === 'docx') {
+    const arrayBuffer = await file.arrayBuffer();
+    try {
+      const result = await mammoth.convertToHtml({ arrayBuffer });
+      setContent(result.value, file.name, 'DOCX → HTML');
+    } catch (e) {
+      alert('Error reading DOCX: ' + e.message);
+    }
+  } else {
+    alert('Unsupported file format. Use .html, .md, or .docx');
+  }
+}
+
+function handlePaste() {
+  const text = document.getElementById('pasteArea').value;
+  if (!text.trim()) return;
+  if (pasteFormat === 'md') {
+    setContent(marked.parse(text), 'pasted-content.md', 'Markdown → HTML');
+  } else {
+    setContent(text, 'pasted-content.html', 'HTML');
+  }
+}
+
+function setPasteFormat(fmt, btn) {
+  pasteFormat = fmt;
+  btn.parentElement.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+  btn.classList.add('active');
+  handlePaste(); // re-process
+}
+
+function setContent(html, name, format) {
+  htmlContent = html;
+  document.getElementById('fileName').textContent = name;
+  document.getElementById('fileSize').textContent = formatBytes(html.length);
+  document.getElementById('fileFormat').textContent = format;
+  showEl('contentLoaded');
+  hideEl('pushResult');
+
+  // Preview
+  document.getElementById('previewRendered').innerHTML = DOMPurify.sanitize(html);
+  document.getElementById('previewRaw').textContent = html.slice(0, 50000) + (html.length > 50000 ? '\n\n... truncated for preview ...' : '');
+
+  // Validate
+  validate(html);
+}
+
+function clearContent() {
+  htmlContent = '';
+  hideEl('contentLoaded');
+  hideEl('pushResult');
+  document.getElementById('previewRendered').innerHTML = '<p style="color:#999;">Upload or paste content to see preview.</p>';
+  document.getElementById('previewRaw').textContent = 'No content yet.';
+  document.getElementById('fileInput').value = '';
+  document.getElementById('pasteArea').value = '';
+}
+
+// ===== VALIDATION =====
+function validate(html) {
+  const el = document.getElementById('validation');
+  const checks = [];
+
+  // Size
+  const sizeKb = html.length / 1024;
+  if (sizeKb > 200) {
+    checks.push({ status: 'warn', text: `Large content: ${sizeKb.toFixed(1)} KB — may be slow to push` });
+  } else {
+    checks.push({ status: 'pass', text: `Content size: ${sizeKb.toFixed(1)} KB` });
+  }
+
+  // Embeds
+  const embedCount = (html.match(/data-rt-embed-type/g) || []).length;
+  const bannerCount = (html.match(/data-url="/g) || []).length;
+  if (embedCount > 0) {
+    checks.push({ status: 'pass', text: `${embedCount} embed divs found (${bannerCount} with banner IDs)` });
+  }
+
+  // Images
+  const imgCount = (html.match(/<img /g) || []).length;
+  if (imgCount > 0) {
+    checks.push({ status: 'pass', text: `${imgCount} images found` });
+  }
+
+  // Script tags
+  const scriptCount = (html.match(/<script/gi) || []).length;
+  const schemaCount = (html.match(/application\/ld\+json/g) || []).length;
+  if (scriptCount > schemaCount) {
+    checks.push({ status: 'warn', text: `${scriptCount - schemaCount} non-schema script tags found (may be stripped by Webflow)` });
+  }
+  if (schemaCount > 0) {
+    checks.push({ status: 'pass', text: `${schemaCount} schema (JSON-LD) script(s) found` });
+  }
+
+  // id attributes
+  const hasIds = /id=""/.test(html);
+  if (hasIds) {
+    checks.push({ status: 'pass', text: 'Webflow id="" attributes present' });
+  } else {
+    checks.push({ status: 'warn', text: 'No id="" attributes — Webflow usually adds these. Content may still work.' });
+  }
+
+  el.innerHTML = checks.map(c => {
+    const icon = c.status === 'pass' ? '&#10003;' : c.status === 'warn' ? '&#9888;' : '&#10007;';
+    return `<div class="val-item val-${c.status}"><span class="icon">${icon}</span> ${c.text}</div>`;
+  }).join('');
+}
+
+// ===== PUSH =====
+async function pushToWebflow() {
+  if (!htmlContent || !selectedItemId) return;
+
+  const fieldSlug = document.getElementById('fieldSelect').value;
+  if (!fieldSlug) { alert('Please select a field to update.'); return; }
+
+  const colId = document.getElementById('collectionSelect').value;
+  const btn = document.getElementById('btnPush');
+  const resultEl = document.getElementById('pushResult');
+
+  btn.disabled = true;
+  btn.innerHTML = '<div class="spinner"></div> Pushing...';
+  showEl('pushResult');
+  resultEl.className = '';
+  resultEl.innerHTML = '<p style="color:var(--text2);">Sending to Webflow API...</p>';
+
+  try {
+    const payload = {
+      fieldData: {}
+    };
+    payload.fieldData[fieldSlug] = htmlContent;
+
+    const result = await wfPatch(`/collections/${colId}/items/${selectedItemId}`, payload);
+
+    // Verify
+    const savedBody = result.fieldData?.[fieldSlug] || '';
+    const savedSize = savedBody.length;
+    const match = savedSize >= htmlContent.length * 0.95;
+
+    resultEl.className = 'result-box success';
+    resultEl.innerHTML = `
+      <strong>Pushed successfully!</strong><br>
+      Sent: ${formatBytes(htmlContent.length)} &rarr; Saved: ${formatBytes(savedSize)}
+      ${match ? ' &#10003;' : ' &#9888; Size mismatch — check content in Webflow'}<br>
+      Item saved as <strong>draft</strong>. Review in Webflow before publishing.
+    `;
+  } catch (e) {
+    resultEl.className = 'result-box error';
+    resultEl.innerHTML = `<strong>Push failed:</strong> ${esc(e.message)}`;
+  } finally {
+    btn.disabled = false;
+    btn.innerHTML = 'Push to CMS';
+  }
+}
+
+// ===== UTILS =====
+function showEl(id) { document.getElementById(id).classList.remove('hidden'); }
+function hideEl(id) { document.getElementById(id).classList.add('hidden'); }
+function esc(s) { const d = document.createElement('div'); d.textContent = s; return d.innerHTML; }
+function formatBytes(b) {
+  if (b < 1024) return b + ' B';
+  return (b / 1024).toFixed(1) + ' KB';
+}
+</script>
+</body>
+</html>

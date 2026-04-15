@@ -1,0 +1,11 @@
+{
+  "name": "webflow-richtext-pusher",
+  "version": "0.1.0",
+  "description": "Push large HTML/Markdown/DOCX content into Webflow CMS rich text fields — bypassing the Designer's size limits.",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js"
+  },
+  "keywords": ["webflow", "cms", "rich-text", "api"],
+  "license": "MIT"
+}
