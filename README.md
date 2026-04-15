@@ -30,15 +30,15 @@ Generate a token at **Site Settings → Apps & Integrations → API Access** wit
 
 **1. Connect** — paste your API token. It stays in your browser and is never stored.
 
-![Connect to Webflow](src/img_01.png)
+![Connect to Webflow](scr/img_1.png)
 
 **2. Select Item** — pick your site, collection, and CMS item. Search by name or slug.
 
-![Select CMS Item](src/img_02.png)
+![Select CMS Item](scr/img_2.png)
 
 **3. Push Content** — upload a file or paste HTML/Markdown. Preview, validate, and push.
 
-![Push Content](src/img_03.png)
+![Push Content](scr/img_3.png)
 
 ## Features
 
