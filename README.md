@@ -9,7 +9,7 @@ Webflow's CMS Designer UI silently truncates or corrupts rich text content large
 ## Quick Start
 
 ```bash
-git clone https://github.com/your-org/webflow-richtext-pusher.git
+git clone https://github.com/ikrasovytskyi/webflow-richtext-pusher.git
 cd webflow-richtext-pusher
 npm start
 ```
