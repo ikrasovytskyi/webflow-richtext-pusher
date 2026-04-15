@@ -16,14 +16,29 @@ npm start
 
 Open http://localhost:3000 in your browser. That's it — no dependencies to install.
 
-## How to Use
+## Required Webflow API Permissions
 
-1. **Get a Webflow API token** — Site Settings → Apps & Integrations → Generate API Token. Scopes needed: `sites:read`, `cms:read`, `cms:write`
-2. **Paste your token** and click Connect
-3. **Select** your site → collection → item → field
-4. **Upload** an `.html`, `.md`, or `.docx` file (or paste content directly)
-5. **Review** the preview and validation checks
-6. **Push** — content is saved as a draft (never auto-published)
+Generate a token at **Site Settings → Apps & Integrations → API Access** with these scopes:
+
+| Scope | Purpose |
+|---|---|
+| `sites:read` | List your sites |
+| `cms:read` | Browse collections and items |
+| `cms:write` | Update rich text fields |
+
+## How It Works
+
+**1. Connect** — paste your API token. It stays in your browser and is never stored.
+
+![Connect to Webflow](src/img_01.png)
+
+**2. Select Item** — pick your site, collection, and CMS item. Search by name or slug.
+
+![Select CMS Item](src/img_02.png)
+
+**3. Push Content** — upload a file or paste HTML/Markdown. Preview, validate, and push.
+
+![Push Content](src/img_03.png)
 
 ## Features
 
@@ -39,7 +54,7 @@ Open http://localhost:3000 in your browser. That's it — no dependencies to ins
 ## Requirements
 
 - Node.js 16+
-- A Webflow API v2 token with `sites:read`, `cms:read`, `cms:write` scopes
+- A Webflow API v2 token (see permissions above)
 
 ## License
 
